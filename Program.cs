@@ -15,6 +15,14 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite("Data Source=app.db"));
+
+// Registrando o serviço de gamificação
+builder.Services.AddScoped<MindHub.Services.GamificationService>(); 
+
+builder.Services.AddControllers();
+
 var app = builder.Build();
 
 // --- TUDO ABAIXO DAQUI É CONFIGURAÇÃO DE COMO O APP RODA ---
