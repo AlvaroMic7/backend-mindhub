@@ -4,7 +4,7 @@ using MindHub.Infrastructure.Data;
 using MindHub.Domain.Models;
 using MindHub.Services;
 
-namespace MindHub.API.Controllers
+namespace MindHub.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -31,9 +31,9 @@ namespace MindHub.API.Controllers
                 .Include(ua => ua.Achievement)
                 .Select(ua => new 
                 {
-                    ua.Achievement.Title,
-                    ua.Achievement.Description,
-                    ua.Achievement.IconName,
+                    ua.Achievement!.Title,
+                    ua.Achievement!.Description,
+                    ua.Achievement!.IconName,
                     EarnedDate = ua.UnlockedAt
                 })
                 .ToListAsync();

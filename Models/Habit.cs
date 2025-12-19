@@ -13,6 +13,8 @@ namespace MindHub.Domain.Models
     {
         public int Id { get; set; }
 
+        public int UserId { get; set; }
+
         [Required]
         [MaxLength(100)]
         public string Title { get; set; } = string.Empty;
@@ -29,6 +31,8 @@ namespace MindHub.Domain.Models
         public string? ColorHex { get; set; }
         public string? IconName { get; set; }
         public TimeSpan? ReminderTime { get; set; }
+
+        public bool IsPaused { get; set; } = false; 
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
