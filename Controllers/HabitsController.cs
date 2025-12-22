@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore; // Importante para usar o Banco
+using Microsoft.EntityFrameworkCore;
+using MindHub.Infrastructure.Data;
 using MindHub.Domain.Models;
 using MindHub.Application.DTOs;
-using MindHub.Infrastructure.Data;
+using MindHub.Services;
 
 namespace MindHub.API.Controllers
 {
@@ -11,92 +12,96 @@ namespace MindHub.API.Controllers
     public class HabitsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly AuthService _authService;
 
-        // Injeção de Dependência: O sistema entrega o banco pronto para uso aqui
-        public HabitsController(AppDbContext context)
+        public HabitsController(AppDbContext context, AuthService authService)
         {
             _context = context;
+            _authService = authService;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetMyHabits()
         {
-            // Busca todos os hábitos no banco de dados
-            var habits = await _context.Habits.ToListAsync();
+            var userId = await GetUserId();
+            if (userId == null) return Unauthorized();
+
+            var habits = await _context.Habits
+                .Where(h => h.UserId == userId)
+                .Select(h => new HabitDto
+                {
+                    Id = h.Id,
+                    Title = h.Title,
+                    Description = h.Description,
+                    Frequency = h.Frequency,
+                    IsPaused = h.IsPaused,
+                    CurrentStreak = h.CurrentStreak,
+                    LongestStreak = h.LongestStreak
+                })
+                .ToListAsync();
+
             return Ok(habits);
         }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
-        {
-            var habit = await _context.Habits.FindAsync(id);
-            if (habit == null) return NotFound();
-            return Ok(habit);
-        }
-
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateHabitDto dto)
+        public async Task<IActionResult> CreateHabit([FromBody] CreateHabitDto dto)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-
-            // Validações de Regra de Negócio
-            if (dto.Frequency == FrequencyType.SpecificDays && (dto.SpecificDays == null || !dto.SpecificDays.Any()))
-                return BadRequest("Selecione pelo menos um dia da semana.");
-
-            if (dto.Frequency == FrequencyType.TimesPerWeek && (dto.TargetCountPerWeek == null || dto.TargetCountPerWeek <= 0))
-                return BadRequest("Defina quantas vezes por semana.");
+            var userId = await GetUserId();
+            if (userId == null) return Unauthorized();
 
             var habit = new Habit
             {
-                // O ID é gerado automaticamente pelo banco agora
                 Title = dto.Title,
                 Description = dto.Description,
                 Frequency = dto.Frequency,
-                SpecificDays = dto.Frequency == FrequencyType.SpecificDays ? dto.SpecificDays : null,
-                TargetCountPerWeek = dto.Frequency == FrequencyType.TimesPerWeek ? dto.TargetCountPerWeek : null,
-                ColorHex = dto.ColorHex,
-                IconName = dto.IconName,
-                ReminderTime = dto.ReminderTime,
-                CreatedAt = DateTime.UtcNow
+                UserId = userId.Value,
+                StartDate = DateTime.UtcNow,
+                CurrentStreak = 0,
+                LongestStreak = 0
             };
 
             _context.Habits.Add(habit);
-            await _context.SaveChangesAsync(); // Salva no arquivo app.db
-
-            return CreatedAtAction(nameof(GetById), new { id = habit.Id }, habit);
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Hábito criado com sucesso!" });
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateHabitDto dto)
+        public async Task<IActionResult> UpdateHabit(int id, [FromBody] UpdateHabitDto dto)
         {
-            var existingHabit = await _context.Habits.FindAsync(id);
-            if (existingHabit == null) return NotFound();
+            var userId = await GetUserId();
+            if (userId == null) return Unauthorized();
 
-            existingHabit.Title = dto.Title;
-            existingHabit.Description = dto.Description;
-            existingHabit.Frequency = dto.Frequency;
-            existingHabit.SpecificDays = dto.Frequency == FrequencyType.SpecificDays ? dto.SpecificDays : null;
-            existingHabit.TargetCountPerWeek = dto.Frequency == FrequencyType.TimesPerWeek ? dto.TargetCountPerWeek : null;
-            existingHabit.ColorHex = dto.ColorHex;
-            existingHabit.IconName = dto.IconName;
-            existingHabit.ReminderTime = dto.ReminderTime;
+            var habit = await _context.Habits.FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId);
+            if (habit == null) return NotFound("Hábito não encontrado.");
 
-            // O Entity Framework detecta que mudou e gera o SQL de update
+            habit.Title = dto.Title;
+            habit.Description = dto.Description;
+            habit.Frequency = dto.Frequency;
+            habit.IsPaused = dto.IsPaused;
+
             await _context.SaveChangesAsync();
-
-            return NoContent();
+            return Ok(new { message = "Hábito atualizado!" });
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> DeleteHabit(int id)
         {
-            var habit = await _context.Habits.FindAsync(id);
+            var userId = await GetUserId();
+            if (userId == null) return Unauthorized();
+
+            var habit = await _context.Habits.FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId);
             if (habit == null) return NotFound();
 
             _context.Habits.Remove(habit);
             await _context.SaveChangesAsync();
+            return Ok(new { message = "Hábito excluído." });
+        }
 
-            return NoContent();
+        private async Task<int?> GetUserId()
+        {
+            if (!Request.Headers.ContainsKey("Authorization")) return null;
+            string token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+            return await _authService.GetUserIdByTokenAsync(token);
         }
     }
 }

@@ -1,29 +1,34 @@
 using System.ComponentModel.DataAnnotations;
-using MindHub.Domain.Models;
 
 namespace MindHub.Application.DTOs
 {
     public class CreateHabitDto
     {
-        [Required(ErrorMessage = "O título é obrigatório.")]
-        public string Title { get; set; } = string.Empty;
-
-        public string? Description { get; set; }
-
         [Required]
-        public FrequencyType Frequency { get; set; }
-
-        public List<DayOfWeek>? SpecificDays { get; set; }
-
-        public int? TargetCountPerWeek { get; set; }
-
-        public string? ColorHex { get; set; }
-        public string? IconName { get; set; }
-        public TimeSpan? ReminderTime { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        [Required]
+        public string Frequency { get; set; } = "Diario"; 
     }
 
-    public class UpdateHabitDto : CreateHabitDto
+    public class UpdateHabitDto
     {
-        // Herda tudo de CreateHabitDto
+        [Required]
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        [Required]
+        public string Frequency { get; set; } = "Diario";
+        public bool IsPaused { get; set; }
+    }
+
+    public class HabitDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string Frequency { get; set; } = string.Empty;
+        public bool IsPaused { get; set; }
+        public int CurrentStreak { get; set; }
+        public int LongestStreak { get; set; }
     }
 }

@@ -17,6 +17,21 @@ namespace MindHub.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
 
+            modelBuilder.Entity("GoalHabit", b =>
+                {
+                    b.Property<int>("GoalsId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HabitsId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("GoalsId", "HabitsId");
+
+                    b.HasIndex("HabitsId");
+
+                    b.ToTable("GoalHabit");
+                });
+
             modelBuilder.Entity("MindHub.Domain.Models.Achievement", b =>
                 {
                     b.Property<int>("Id")
@@ -56,49 +71,77 @@ namespace MindHub.Migrations
                         });
                 });
 
-            modelBuilder.Entity("MindHub.Domain.Models.Habit", b =>
+            modelBuilder.Entity("MindHub.Domain.Models.Goal", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("ColorHex")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Description")
-                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Frequency")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("IconName")
+                    b.Property<DateTime>("EndDate")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("IsPaused")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<TimeSpan?>("ReminderTime")
+                    b.Property<DateTime>("StartDate")
                         .HasColumnType("TEXT");
 
-                    b.PrimitiveCollection<string>("SpecificDays")
+                    b.Property<string>("Status")
+                        .IsRequired()
                         .HasColumnType("TEXT");
-
-                    b.Property<int?>("TargetCountPerWeek")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("UserId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Goals");
+                });
+
+            modelBuilder.Entity("MindHub.Domain.Models.Habit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CurrentStreak")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsPaused")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastCompletedDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LongestStreak")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Habits");
                 });
@@ -109,10 +152,7 @@ namespace MindHub.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTime>("CompletedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateOnly>("Date")
+                    b.Property<DateTime>("CheckInDate")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("HabitId")
@@ -162,14 +202,14 @@ namespace MindHub.Migrations
                     b.Property<DateTime>("UnlockedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("UserProfileId")
+                    b.Property<int>("UserId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AchievementId");
 
-                    b.HasIndex("UserProfileId");
+                    b.HasIndex("UserId");
 
                     b.ToTable("UserAchievements");
                 });
@@ -223,10 +263,47 @@ namespace MindHub.Migrations
                     b.ToTable("UserSessions");
                 });
 
+            modelBuilder.Entity("GoalHabit", b =>
+                {
+                    b.HasOne("MindHub.Domain.Models.Goal", null)
+                        .WithMany()
+                        .HasForeignKey("GoalsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MindHub.Domain.Models.Habit", null)
+                        .WithMany()
+                        .HasForeignKey("HabitsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MindHub.Domain.Models.Goal", b =>
+                {
+                    b.HasOne("MindHub.Domain.Models.UserProfile", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("MindHub.Domain.Models.Habit", b =>
+                {
+                    b.HasOne("MindHub.Domain.Models.UserProfile", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("MindHub.Domain.Models.HabitCheckIn", b =>
                 {
                     b.HasOne("MindHub.Domain.Models.Habit", "Habit")
-                        .WithMany()
+                        .WithMany("CheckIns")
                         .HasForeignKey("HabitId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -237,20 +314,20 @@ namespace MindHub.Migrations
             modelBuilder.Entity("MindHub.Domain.Models.UserAchievement", b =>
                 {
                     b.HasOne("MindHub.Domain.Models.Achievement", "Achievement")
-                        .WithMany()
+                        .WithMany("UserAchievements")
                         .HasForeignKey("AchievementId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("MindHub.Domain.Models.UserProfile", "UserProfile")
+                    b.HasOne("MindHub.Domain.Models.UserProfile", "User")
                         .WithMany()
-                        .HasForeignKey("UserProfileId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Achievement");
 
-                    b.Navigation("UserProfile");
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("MindHub.Domain.Models.UserSession", b =>
@@ -262,6 +339,16 @@ namespace MindHub.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("MindHub.Domain.Models.Achievement", b =>
+                {
+                    b.Navigation("UserAchievements");
+                });
+
+            modelBuilder.Entity("MindHub.Domain.Models.Habit", b =>
+                {
+                    b.Navigation("CheckIns");
                 });
 #pragma warning restore 612, 618
         }

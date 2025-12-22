@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using MindHub.Domain.Models;
 using MindHub.Infrastructure.Data;
+using MindHub.Domain.Models;
 
 namespace MindHub.Services
 {
@@ -13,99 +13,55 @@ namespace MindHub.Services
             _context = context;
         }
 
-        // Chamado quando o usuário MARCA o hábito (Ganha pontos)
-        public async Task ProcessCheckInAsync(int userProfileId)
+        public async Task ProcessCheckInAsync(int userId, int habitId)
         {
-            var user = await _context.UserProfiles.FindAsync(userProfileId);
+            // 1. Busca o usuário para dar pontos
+            var user = await _context.UserProfiles.FindAsync(userId);
             if (user == null) return;
 
-            // 1. Dá os pontos
+            // Adiciona 10 XP
             user.CurrentPoints += 10;
-            
-            // 2. Verifica se ganhou emblemas
-            await CheckWeeklyBadgeAsync(userProfileId);
-            await CheckMonthlyTrophyAsync(userProfileId);
 
-            // 3. Salva tudo (Pontos e Emblemas)
+            // 2. Verifica conquista de Semana Perfeita
+            // Regra: Ter feito pelo menos 7 check-ins nos últimos 7 dias
+            var dataLimite = DateTime.UtcNow.AddDays(-7);
+            
+            // Correção aqui: Usamos 'CheckInDate' (que é o nome certo no seu Model agora)
+            var totalCheckInsSemana = await _context.CheckIns
+                .CountAsync(c => c.Habit.UserId == userId && c.CheckInDate >= dataLimite);
+
+            if (totalCheckInsSemana >= 7)
+            {
+                await UnlockAchievement(userId, 1); // ID 1 = Conquista Semanal
+            }
+            
+            // 3. Verifica conquista de Ofensiva (Foguinho)
+            // Busca o hábito para ver o Streak atual
+            var habit = await _context.Habits.FindAsync(habitId);
+            
+            // Correção aqui: Usamos 'CurrentStreak' (que adicionamos hoje no Model)
+            if (habit != null && habit.CurrentStreak >= 30)
+            {
+                await UnlockAchievement(userId, 2); // ID 2 = Conquista Mensal
+            }
+
             await _context.SaveChangesAsync();
         }
 
-        // NOVO: Chamado quando o usuário DESMARCA (Perde pontos)
-        public async Task RemovePointsAsync(int userProfileId)
+        private async Task UnlockAchievement(int userId, int achievementId)
         {
-            var user = await _context.UserProfiles.FindAsync(userProfileId);
-            if (user != null)
-            {
-                // Remove 10 pontos
-                user.CurrentPoints -= 10;
+            // Verifica se já tem essa conquista para não duplicar
+            bool jaTem = await _context.UserAchievements
+                .AnyAsync(ua => ua.UserId == userId && ua.AchievementId == achievementId);
 
-                // Segurança: Não deixa ficar negativo
-                if (user.CurrentPoints < 0) user.CurrentPoints = 0;
-                
-                await _context.SaveChangesAsync();
-            }
-        }
-
-        private async Task CheckWeeklyBadgeAsync(int userId)
-        {
-            bool alreadyHas = await _context.UserAchievements
-                .AnyAsync(ua => ua.UserProfileId == userId && ua.AchievementId == 1);
-            if (alreadyHas) return;
-
-            var sevenDaysAgo = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7));
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-            int checkInsCount = await _context.CheckIns
-                .CountAsync(c => c.Date >= sevenDaysAgo && c.Date <= today);
-
-            int targetCheckIns = 20; // Meta simplificada para o MVP
-
-            if (checkInsCount >= targetCheckIns)
+            if (!jaTem)
             {
                 _context.UserAchievements.Add(new UserAchievement
                 {
-                    UserProfileId = userId,
-                    AchievementId = 1,
+                    UserId = userId,
+                    AchievementId = achievementId,
                     UnlockedAt = DateTime.UtcNow
                 });
-            }
-        }
-
-        private async Task CheckMonthlyTrophyAsync(int userId)
-        {
-            bool alreadyHas = await _context.UserAchievements
-                .AnyAsync(ua => ua.UserProfileId == userId && ua.AchievementId == 2);
-            if (alreadyHas) return;
-
-            var habits = await _context.Habits.ToListAsync();
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-            foreach (var habit in habits)
-            {
-                bool streakBroken = false;
-                for (int i = 0; i < 30; i++)
-                {
-                    var dateToCheck = today.AddDays(-i);
-                    bool hasCheckIn = await _context.CheckIns
-                        .AnyAsync(c => c.HabitId == habit.Id && c.Date == dateToCheck);
-                    
-                    if (!hasCheckIn)
-                    {
-                        streakBroken = true;
-                        break;
-                    }
-                }
-
-                if (!streakBroken)
-                {
-                    _context.UserAchievements.Add(new UserAchievement
-                    {
-                        UserProfileId = userId,
-                        AchievementId = 2,
-                        UnlockedAt = DateTime.UtcNow
-                    });
-                    break;
-                }
             }
         }
     }
